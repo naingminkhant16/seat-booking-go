@@ -1,5 +1,11 @@
 package booking
 
+import "errors"
+
+var (
+	ErrSeatAlreadyTaken = errors.New("seat already taken")
+)
+
 // Booking Representation of confirmed seat reservation
 type Booking struct {
 	ID      string
@@ -11,5 +17,5 @@ type Booking struct {
 
 type BookingStore interface {
 	Book(b Booking) error
-	ListBooking(movieID string) []Booking
+	ListBookings(movieID string) []Booking
 }
