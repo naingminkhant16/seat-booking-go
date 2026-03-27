@@ -1,23 +1,47 @@
 package main
 
 import (
+	"MovieSeatBooking/internal/adapters/redis"
 	"MovieSeatBooking/internal/booking"
+	"MovieSeatBooking/internal/utils"
 	"log"
+	"net/http"
 )
 
-func main() {
-	newStore := booking.NewMemoryStore()
-	service := booking.NewService(newStore)
+type movieResponse struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Rows        int    `json:"rows"`
+	SeatsPerRow int    `json:"seats_per_row"`
+}
 
-	err := service.Book(booking.Booking{
-		ID:      "1",
-		MovieID: "1",
-		SeatID:  "A1",
-		UserID:  "10",
-		Status:  "reserved",
-	})
-	if err != nil {
-		return
+func main() {
+	mux := http.NewServeMux()
+
+	redisStore := booking.NewRedisStore(redis.NewClient("localhost:6379"))
+	svc := booking.NewService(redisStore)
+	bookingHandler := booking.NewHandler(svc)
+
+	mux.HandleFunc("GET /movies", listMovies)
+	mux.Handle("GET /", http.FileServer(http.Dir("static")))
+
+	mux.HandleFunc("GET /movies/{movieID}/seats", bookingHandler.ListSeats)
+	mux.HandleFunc("POST /movies/{movieID}/seats/{seatID}/hold", bookingHandler.SeatHold)
+
+	mux.HandleFunc("PUT /sessions/{sessionID}/confirm", bookingHandler.ConfirmSession)
+	mux.HandleFunc("DELETE /sessions/{sessionID}", bookingHandler.ReleaseSession)
+
+	if err := http.ListenAndServe(":8080", mux); err != nil {
+		log.Fatal(err)
 	}
-	log.Println(newStore.ListBookings("1"))
+
+}
+
+var movies = []movieResponse{
+	{ID: "inception", Title: "Inception", Rows: 5, SeatsPerRow: 8},
+	{ID: "dune", Title: "Dune: Part Two", Rows: 4, SeatsPerRow: 6},
+}
+
+func listMovies(w http.ResponseWriter, req *http.Request) {
+	utils.WriteJSON(w, http.StatusOK, movies)
 }
